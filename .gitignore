@@ -1,0 +1,6 @@
+*.log
+*.tmp
+mr_mega_script.sh
+meta_regression/
+tomoko/
+.DS_Store
