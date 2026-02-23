@@ -1,0 +1,72 @@
+# Meta-analysis description for <CURRENT_TRAIT>
+
+# Meta-analysis weighted by standard error does not work well
+# when different studies used very different transformations.
+# If wishing to use a standard error approach then SAMPLESIZE
+# should be replaced with "STDERR"
+# SAMPLESIZE is the default for METAL however.
+
+SCHEME SAMPLESIZE
+
+# Usually, it is a good to apply genomic control to each
+# input file. However, in this example, all the markers being
+# examined reside in strongly associated loci and it probably 
+# is not a good idea. To find out what happens if you turn
+# on genomic control, uncomment the following line.
+
+GENOMICCONTROL ON
+
+# To help identify allele flips, it can be useful to track
+# allele frequencies in the meta-analysis.
+# This capability can be cancelled by commenting the following two lines.
+
+AVERAGEFREQ ON
+MINMAXFREQ ON
+
+# To restrict meta-analysis to two previously reported SNPs uncomment the next
+# command line.
+# ADDFILTER SNP IN (rs10830963,rs563694)
+
+# Option to include chromosome and position in the output file
+# This also tracks the SNPs to make sure CHR + POS match across SNPs
+
+TRACKPOSITIONS ON
+CHROMOSOMELABEL chr
+POSITIONLABEL pos
+
+# To turn on the summarizing of study specific results for each variant
+# Uncomment the following command line.
+
+# VERBOSE ON
+
+# Standardized METAL input columns
+
+MARKER   snpid
+WEIGHT   n
+ALLELE   a1 a0
+FREQ     freq1
+EFFECT   beta1
+STDERR   se
+PVAL     p
+
+# PROCESS command must be applied to each file name.
+# Standardizing input makes this simple.
+
+<PROCESS_FILES>
+
+# Outfile location and name
+
+OUTFILE <OUTFILE_NAME> .TBL
+
+# Actually run the analysis
+# Include analsis of heterogeneity, but if you want to change this, just delete the 
+# heterogeneity part of the command
+
+ANALYZE HETEROGENEITY
+
+
+# End run
+
+QUIT
+
+
