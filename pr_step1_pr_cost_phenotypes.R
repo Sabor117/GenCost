@@ -208,6 +208,7 @@ final_phenotypes$hes_costs_year = cost_years_phenotype(final_phenotypes, c("hes_
 final_phenotypes$prescription_costs_year = cost_years_phenotype(final_phenotypes, c("prescription_costs"), "prescript_days_of_followup")
 
 ### Get list of IIDs with < 5 years follow-up
+### NOTE OBJECTS ARE TITLED E.G. "hes_less_4_years_iids" - HOWEVER WE USE LESS THAN 5 YEARS AS CUT-OFF
 
 followup_minimum = 365.25 * 5
 
@@ -352,6 +353,165 @@ fwrite(prescript_based_frame[,c("FID", "IID", "log_prescription_costs_year")],
         paste0(mainDir, "outputs/cost_phenotypes/FINAL_prescription_based_phenotype_frame_REGENIE.tsv"),
         row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
 
+
+
+#####################
+
+### Additional tests for review - 2026
+
+#####################
+
+### HES frame
+
+hes_based_frame = final_phenotypes[,c("eid", "hes_costs_year")]
+
+### Then remove IIDs with < 4 years follow-up
+
+hes_based_frame = hes_based_frame[!(hes_based_frame$eid %in% hes_less_4_years_iids),]
+
+### Two versions:
+### One is non-log-transformed - still add up to one
+### One is log-transformed but excludes "true" zeroes
+
+non_log_hes = hes_based_frame
+non_log_hes$hes_costs_year[non_log_hes$hes_costs_year < 1] = 1
+
+non_log_hes$IID = non_log_hes$eid
+non_log_hes$FID = non_log_hes$eid
+
+colnames(non_log_hes)[2] = "IN_RAW_COST"
+
+non_zero_hes = hes_based_frame
+non_zero_hes = non_zero_hes[non_zero_hes$hes_costs_year > 0,] # First remove all TRUE zeroes
+
+if (nrow(non_zero_hes[non_zero_hes$hes_costs_year < 1,]) > 0){
+
+    non_zero_hes$hes_costs_year[non_zero_hes$hes_costs_year < 1] = 1 # Anything less than 1 is moved to 1
+
+}
+
+non_zero_hes$IID = non_zero_hes$eid
+non_zero_hes$FID = non_zero_hes$eid
+
+colnames(non_zero_hes)[2] = "IN_NO_ZERO_COST"
+
+non_zero_hes$IN_NO_ZERO_COST = log(non_zero_hes$IN_NO_ZERO_COST)
+
+non_log_hes = non_log_hes[!(non_log_hes$IID %in% withdrawn$withdrawn),]
+non_zero_hes = non_zero_hes[!(non_zero_hes$IID %in% withdrawn$withdrawn),]
+
+fwrite(non_log_hes[,c("FID", "IID", "IN_RAW_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_raw_cost_INPAT_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
+
+fwrite(non_zero_hes[,c("FID", "IID", "IN_NO_ZERO_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_non_zero_INPAT_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
+
+### GP frame
+
+gp_based_frame = final_phenotypes[,c("eid", "gp_costs_year")]
+gp_based_frame = gp_based_frame[gp_based_frame$eid %in% gp_iids,]
+
+### Then remove IIDs with < 4 years follow-up
+
+gp_based_frame = gp_based_frame[!(gp_based_frame$eid %in% gp_less_4_years_iids),]
+
+### Some NAs - these HAVE > 5 years follow-up (in data for > 5 years) but no costs in this time - TRUE ZEROS
+
+gp_based_frame$gp_costs_year[is.na(gp_based_frame$gp_costs_year)] = 0
+
+### Two versions:
+### One is non-log-transformed - still add up to one
+### One is log-transformed but excludes "true" zeroes
+
+non_log_gp = gp_based_frame
+non_log_gp$gp_costs_year[non_log_gp$gp_costs_year < 1] = 1
+
+non_log_gp$IID = non_log_gp$eid
+non_log_gp$FID = non_log_gp$eid
+
+colnames(non_log_gp)[2] = "PRIM_RAW_COST"
+
+non_zero_gp = gp_based_frame
+non_zero_gp = non_zero_gp[non_zero_gp$gp_costs_year > 0,] # First remove all TRUE zeroes
+
+if (nrow(non_zero_gp[non_zero_gp$gp_costs_year < 1,]) > 0){
+
+    non_zero_gp$gp_costs_year[non_zero_gp$gp_costs_year < 1] = 1 # Anything less than 1 is moved to 1
+
+}
+
+non_zero_gp$IID = non_zero_gp$eid
+non_zero_gp$FID = non_zero_gp$eid
+
+colnames(non_zero_gp)[2] = "PRIM_NO_ZERO_COST"
+
+non_zero_gp$PRIM_NO_ZERO_COST = log(non_zero_gp$PRIM_NO_ZERO_COST)
+
+non_log_gp = non_log_gp[!(non_log_gp$IID %in% withdrawn$withdrawn),]
+non_zero_gp = non_zero_gp[!(non_zero_gp$IID %in% withdrawn$withdrawn),]
+
+fwrite(non_log_gp[,c("FID", "IID", "PRIM_RAW_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_raw_cost_PRIM_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
+
+fwrite(non_zero_gp[,c("FID", "IID", "PRIM_NO_ZERO_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_non_zero_PRIM_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
+
+
+### Prescriptions frame
+
+prescript_based_frame = final_phenotypes[,c("eid", "prescription_costs_year")]
+prescript_based_frame = prescript_based_frame[prescript_based_frame$eid %in% prescriptions_iids,]
+
+### Then remove IIDs with < 4 years follow-up
+
+prescript_based_frame = prescript_based_frame[!(prescript_based_frame$eid %in% presript_less_4_years_iids),]
+
+### Some NAs - these HAVE > 5 years follow-up (in data for > 5 years) but no costs in this time - TRUE ZEROS
+
+prescript_based_frame$prescription_costs_year[is.na(prescript_based_frame$prescription_costs_year)] = 0
+
+### Two versions:
+### One is non-log-transformed - still add up to one
+### One is log-transformed but excludes "true" zeroes
+
+non_log_prescript = prescript_based_frame
+non_log_prescript$prescription_costs_year[non_log_prescript$prescription_costs_year < 1] = 1
+
+non_log_prescript$IID = non_log_prescript$eid
+non_log_prescript$FID = non_log_prescript$eid
+
+colnames(non_log_prescript)[2] = "DRUG_RAW_COST"
+
+non_zero_prescript = prescript_based_frame
+non_zero_prescript = non_zero_prescript[non_zero_prescript$prescription_costs_year > 0,] # First remove all TRUE zeroes
+
+if (nrow(non_zero_prescript[non_zero_prescript$prescription_costs_year < 1,]) > 0){
+
+    non_zero_prescript$prescription_costs_year[non_zero_prescript$prescription_costs_year < 1] = 1 # Anything less than 1 is moved to 1
+
+}
+
+non_zero_prescript$IID = non_zero_prescript$eid
+non_zero_prescript$FID = non_zero_prescript$eid
+
+colnames(non_zero_prescript)[2] = "DRUG_NO_ZERO_COST"
+
+non_zero_prescript$DRUG_NO_ZERO_COST = log(non_zero_prescript$DRUG_NO_ZERO_COST)
+
+non_log_prescript = non_log_prescript[!(non_log_prescript$IID %in% withdrawn$withdrawn),]
+non_zero_prescript = non_zero_prescript[!(non_zero_prescript$IID %in% withdrawn$withdrawn),]
+
+fwrite(non_log_prescript[,c("FID", "IID", "DRUG_RAW_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_raw_cost_DRUG_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
+
+fwrite(non_zero_prescript[,c("FID", "IID", "DRUG_NO_ZERO_COST")],
+        paste0(mainDir, "outputs/cost_phenotypes/FINAL_non_zero_DRUG_REGENIE.tsv"),
+        row.names = FALSE, sep = "\t", quote = FALSE, na = "NA")
 
 
 #####################

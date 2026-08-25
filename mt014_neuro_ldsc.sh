@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=mt14_neuro_ldsc
+#SBATCH --job-name=mt014_neuro_ldsc
 #SBATCH --time=3-00:00:00
 #SBATCH --partition=small
 #SBATCH --ntasks=1
@@ -37,7 +37,7 @@ mainDir="/scratch/project_2007428/projects/prj_001_cost_gwas/"
 intermediateDir="${mainDir}processing/ldsc_intermediate_files/misc/"
 metaDir="${mainDir}processing/ldsc_intermediate_files/META_v4/"
 
-currFile="/scratch/project_2007428/projects/prj_001_cost_gwas/processing/misc_data/sumstats_neuroticism_ctg_format.txt.gz"
+currFile="/scratch/project_2007428/projects/prj_001_cost_gwas/processing/misc_data/neuroticism_ldsc_input.txt.gz"
 
 
 ##### =========================== #####
@@ -64,12 +64,12 @@ printf "\n\n==========================\n\n"
     --out "${intermediateDir}/${phenotype}_ldsc_munged" \
     --merge-alleles /projappl/project_2007428/software/ldsc/w_hm3.snplist \
     --sumstats "${currFile}" \
-    --snp RSID \
-    --a1 A1 \
-    --a2 A2 \
-    --p P \
-    --N-col N \
-    --signed-sumstats Z,0 \
+    --snp snpid \
+    --a1 a1 \
+    --a2 a0 \
+    --p p \
+    --N-col n \
+    --signed-sumstats zscore1,0 \
     --a1-inc
 
 
@@ -93,8 +93,8 @@ for meta_file in "${metaDir}"/*_META_v4_META_v4_ldsc_munged.sumstats.gz; do
 
     /projappl/project_2007428/software/ldsc/ldsc.py \
         --rg "${munged_file},${meta_file}" \
-        --ref-ld-chr /projappl/project_2007428/software/ldsc/eur_w_ld_chr/ \
-        --w-ld-chr /projappl/project_2007428/software/ldsc/eur_w_ld_chr/ \
+        --ref-ld-chr /projappl/project_2007428/software/ldsc/Ref/eur_w_ld_chr/ \
+        --w-ld-chr /projappl/project_2007428/software/ldsc/Ref/eur_w_ld_chr/ \
         --out "${intermediateDir}/${phenotype}_${meta_base}"
 
 done

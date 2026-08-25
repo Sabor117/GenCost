@@ -5,7 +5,7 @@ library(reshape)
 library(ggplot2)
 library(tidyverse)
 
-phenotype = "META_v4"
+phenotype = "SENSITIVITY_TEST"
 n_cohorts = length(Sys.glob(paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/processing/ldsc_intermediate_files/", phenotype, "/*_ldsc_input.txt.gz"))) - 1
 
 all_corrs = Sys.glob(paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/processing/ldsc_intermediate_files/", phenotype, "/*ldsc_corr.log"))
@@ -33,6 +33,9 @@ outFile$cohort2 = basename(outFile$p2)
 
 outFile$cohort1 = gsub(paste0("_", phenotype, "_ldsc_munged.sumstats.gz"), "", outFile$cohort1)
 outFile$cohort2 = gsub(paste0("_", phenotype, "_ldsc_munged.sumstats.gz"), "", outFile$cohort2)
+
+outFile$cohort1 = gsub("_ldsc_munged.sumstats.gz", "", outFile$cohort1)
+outFile$cohort2 = gsub("_ldsc_munged.sumstats.gz", "", outFile$cohort2)
 
 outFile$cohort1 = gsub("_ldsc_input.txt.gz", "", outFile$cohort1)
 outFile$cohort2 = gsub("_ldsc_input.txt.gz", "", outFile$cohort2)
@@ -70,6 +73,17 @@ fwrite(filtered_outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_
 		quote = FALSE, sep = "\t", row.names = FALSE, na = "NA")
 fwrite(outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/outputs/ldsc/cohort_ldsc_correlations_nonfiltered_", phenotype, "_v04.txt"),
 		quote = FALSE, sep = "\t", row.names = FALSE, na = "NA")
+
+### Additional lines specifically for the SENSITIVITY ANALYSIS
+### Reduces the table to only comparison between phenotypes (e.g. IN with IN and not IN with DRUG)
+
+#get_pheno = function(x) gsub(".*UKB_(IN|DRUG|PRIM).*", "\\1", x)
+
+#filtered_outFile = filtered_outFile[get_pheno(filtered_outFile$cohort1) == get_pheno(filtered_outFile$cohort2),]
+
+#fwrite(filtered_outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/outputs/ldsc/cohort_ldsc_correlations_", phenotype, "_PRUNED_v04.txt"),
+#		quote = FALSE, sep = "\t", row.names = FALSE, na = "NA")
+
 
 outFile_rgs = outFile
 

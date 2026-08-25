@@ -47,10 +47,16 @@ if (length(all_gwas_files) == 0){
 
 phenotypes = basename(all_gwas_files)
 phenotypes = gsub(".regenie", "", phenotypes)
-phenotypes_split = str_split_fixed(phenotypes, "_log_", 2)
-phenotypes = unique(phenotypes_split[,2])
+phenotypes_split = str_split_fixed(phenotypes, "_step2_", 2) # For main GWAS split on _log_
+phenotypes = unique(phenotypes_split[,1]) # For main GWAS select 2
 
-population = strsplit(basename(currGWAS), "_")[[1]][2]
+#population = strsplit(basename(currGWAS), "_")[[1]][2]
+
+population = case_when(grepl("EUR", phenotypes) ~ "EUR",
+                        grepl("CSA", phenotypes) ~ "CSA",
+                        grepl("ESA", phenotypes) ~ "ESA",
+                        grepl("AFR", phenotypes) ~ "AFR",
+                        .default = "EUR")
 
 for (i in 1:length(phenotypes)){
 
@@ -114,16 +120,44 @@ for (i in 1:length(phenotypes)){
         }
     }
 
+    if (grepl("RAW", phenotypes[i]) | grepl("NON", phenotypes[i])) {
+
+        sensitivity_test = TRUE
+
+        sen_stratif = case_when(grepl("RAW", phenotypes[i]) ~ "RAW_COST",
+                                    grepl("NON", phenotypes[i]) ~ "NO_ZERO",
+                                    .default = "ALL")
+
+    } else {
+
+        sensitivity_test = FALSE
+
+    }
+
     sample_size = max(unique(curr_output$N))
 
     nice_pheno = case_when(currPheno == "gp_costs_year" ~ "PRIM",
                             currPheno == "total_costs_year" ~ "TOTAL",
                             currPheno == "hes_costs_year" ~ "IN",
                             currPheno == "prescription_costs_year" ~ "DRUG",
+                            grepl("DRUG_", currPheno) ~ "DRUG",
+                            grepl("IN_", currPheno) ~ "IN",
+                            grepl("INOUT_", currPheno) ~ "INOUT",
+                            grepl("PRIM_", currPheno) ~ "PRIM",
                             .default = as.character(currPheno)
                             )
 
-    file_output_name = paste0("UKB.SMW.", nice_pheno, ".", age_strat, ".", gender_strat, ".", population, ".", sample_size, ".REGENIE.20240305.txt.gz")
+    curr_date = format(Sys.Date(), "%Y%m%d")
+
+    if (isTRUE(sensitivity_test)){
+
+        file_output_name = paste0("UKB.SMW.", nice_pheno, ".", age_strat, ".", gender_strat, ".", sen_stratif, ".", population, ".", sample_size, ".REGENIE.", curr_date, ".txt.gz")
+
+    } else {
+
+        file_output_name = paste0("UKB.SMW.", nice_pheno, ".", age_strat, ".", gender_strat, ".", population, ".", sample_size, ".REGENIE.", curr_date, ".txt.gz")
+
+    }
 
     if (grepl("HES", currGWAS)){
 

@@ -884,7 +884,7 @@ fwrite(primary_pheno_2, "/scratch/project_2007428/projects/prj_001_cost_gwas/out
 
 ### PLOT
 
-png(paste0(manhattan_figDir, "IN_plus_DRUG_miami_plot_highlighted.png"), width = 3500, height = 2200, res = 300)
+png(paste0(manhattan_figDir, "IN_plus_DRUG_miami_plot_highlighted_2.png"), width = 3500, height = 2200, res = 300)
 #par(mar=c(5.1,5.1,4.1,2.1))
 
 miami(x = primary_pheno_1,
@@ -1101,7 +1101,7 @@ fwrite(primary_pheno_2, "/scratch/project_2007428/projects/prj_001_cost_gwas/out
 
 ### PLOT
 
-png(paste0(manhattan_figDir, "INOUT_plus_PRIM_miami_plot_highlighted.png"), width = 3500, height = 2200, res = 300)
+png(paste0(manhattan_figDir, "INOUT_plus_PRIM_miami_plot_highlighted_nolims.png"), width = 3500, height = 2200, res = 300)
 #par(mar=c(5.1,5.1,4.1,2.1))
 
 miami(x = primary_pheno_1,
@@ -1110,8 +1110,8 @@ miami(x = primary_pheno_1,
     #highlight = "highlight_col",
     #highlight_col = "black",
     genomewideline = -log10(5e-8),
-    ymin = -25,
-    ymax = 25,
+    ymin = -40,
+    ymax = 40,
     col1 = purple_set,
     col2 = green_set,
     x.name = paste0("Inpatient + outpatient costs"),

@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --mem-per-cpu=128G
 #SBATCH --account=project_2007428
-#SBATCH --array=1-72
+#SBATCH --array=1,2,52,53,78,79
 #SBATCH --output=/scratch/project_2007428/projects/prj_001_cost_gwas/logs/an01_combine_UKB_ALL_out_%a.log
 #SBATCH --error=/scratch/project_2007428/projects/prj_001_cost_gwas/logs/an01_combine_UKB_ALL_out_%a.log
 

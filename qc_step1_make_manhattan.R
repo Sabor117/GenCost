@@ -16,322 +16,407 @@ library(RColorBrewer)
 
 ##############################
 
-miami <- function (x, y=NULL, chr = "chr", bp = "pos", p = "p", snp = "rsid", col1 = c("#e34a33", "#fdbb84"), col2 = c("#2b8cbe","#a6bddb"), chrlabs = NULL, suggestiveline = -log10(1e-05),
-          genomewideline = -log10(5e-08), ymin = -15, ymax = 15, x.name = "x", y.name = "y", highlight = NULL, highlight_col="red", label = NULL, logp = TRUE, ymid = 0, ...)
-  {
+miami <- function (
+    x, y = NULL,
+    chr = "chr", bp = "pos", p = "p", snp = "rsid",
+    col1 = c("#e34a33", "#fdbb84"), col2 = c("#2b8cbe","#a6bddb"),
+    chrlabs = NULL, suggestiveline = -log10(1e-05),
+    genomewideline = -log10(5e-08), ymin = -15, ymax = 15,
+    x.name = "x", y.name = "y", highlight = NULL, highlight_col = "red",
+    label = NULL, logp = TRUE, ymid = 0,
+    special_colouring = FALSE, special_flag = NULL, special_colour = NULL,
+    ...
+  ) {
+
+  ## Local variable placeholders to avoid NOTE checks
   CHR = BP = P = index = NULL
+
+  # small transform to handle mid offset
   ymid <- abs(ymid)
   ymin = ymin + ymid
   ymax = ymax - ymid
 
-  #----
-  # Check variables
-  #----
-
+  # ---- helper: column presence/type check ----
   column_check <- function(column, df) {
-    if (!(column %in% names(df)))
-      stop(paste0("Column ", column, " not found in ",deparse(substitute(df)),"!"))
-    if (!(column == snp) & !is.numeric(df[[column]]))
-      stop(paste(column, "column in",deparse(substitute(df)),"should be numeric."))
+    if (!(column %in% names(df))) stop(paste0("Column ", column, " not found in ", deparse(substitute(df)), "!"))
+    if (!(column == snp) & !is.numeric(df[[column]])) stop(paste(column, "column in", deparse(substitute(df)), "should be numeric."))
   }
+  for (column in c(bp, p, chr, snp)) column_check(column, x)
+  if (!is.null(y)) for (column in c(bp, p, chr, snp)) column_check(column, y)
 
-  for (column in c(bp,p,chr,snp)) column_check(column, x)
-  if(!is.null(y)) for (column in c(bp,p,chr,snp)) column_check(column, y)
-
-  #----
-  # Create data frame
-  #----
+  # ---- LOAD D1 (primary/top) ----
   print("##LOAD D1")
-  
-  d1 = data.table(CHR = x[[chr]], BP = x[[bp]], P = x[[p]])
+  d1 <- data.table::data.table(CHR = x[[chr]], BP = x[[bp]], P = x[[p]])
   if (!is.null(x[[snp]])) d1$SNP <- x[[snp]]
   if (!is.null(highlight)) d1$highlight <- x[[highlight]]
+
+  # --- attach special columns BEFORE any subsetting so they stay aligned ---
+  if (special_colouring && !is.null(special_flag) && !is.null(special_colour)) {
+    # helper to coerce flexible flag encodings to logical (TRUE/FALSE/NA)
+    coerce_flag <- function(sf) {
+      if (is.null(sf)) return(rep(NA, nrow(d1)))
+      # accept TRUE/FALSE, 1/0, "1"/"0", "TRUE"/"FALSE", "T"/"F"
+      v <- ifelse(is.na(sf), NA,
+                  sf %in% c(TRUE, 1, "1", "TRUE", "T"))
+      return(v)
+    }
+    if (special_flag %in% names(x)) {
+      d1$special_flag <- coerce_flag(x[[special_flag]])
+    } else {
+      d1$special_flag <- NA
+    }
+    if (special_colour %in% names(x)) {
+      sc <- as.character(x[[special_colour]])
+      sc[sc == ""] <- NA_character_
+      d1$special_colour <- sc
+    } else {
+      d1$special_colour <- NA_character_
+    }
+  }
+
+  # keep only numeric CHR/BP/P rows
   d1 <- subset(d1, (is.numeric(CHR) & is.numeric(BP) & is.numeric(P)))
   d1 <- d1[order(d1$CHR, d1$BP), ]
   if (logp) {
     d1$logp <- -log10(d1$P) - ymid
-    d1 <- d1[d1$logp > 0,]
+    d1 <- d1[d1$logp > 0, ]
   } else {
     d1$logp <- d1$P - ymid
-    d1 <- d1[d1$logp > 0,]
+    d1 <- d1[d1$logp > 0, ]
   }
-  
-  
-  if(!is.null(y)) {
+
+  # ---- LOAD D2 (bottom) only if provided ----
+  if (!is.null(y)) {
     print("##LOAD D2")
-    d2 = data.table(CHR = y[[chr]], BP = y[[bp]], P = y[[p]])
+    d2 <- data.table::data.table(CHR = y[[chr]], BP = y[[bp]], P = y[[p]])
     if (!is.null(y[[snp]])) d2$SNP <- y[[snp]]
     if (!is.null(highlight)) d2$highlight <- y[[highlight]]
+
+    # attach special columns for d2 (same coercion logic)
+    if (special_colouring && !is.null(special_flag) && !is.null(special_colour)) {
+      coerce_flag2 <- function(sf) {
+        if (is.null(sf)) return(rep(NA, nrow(d2)))
+        v <- ifelse(is.na(sf), NA,
+                    sf %in% c(TRUE, 1, "1", "TRUE", "T"))
+        return(v)
+      }
+      if (special_flag %in% names(y)) {
+        d2$special_flag <- coerce_flag2(y[[special_flag]])
+      } else {
+        d2$special_flag <- NA
+      }
+      if (special_colour %in% names(y)) {
+        sc2 <- as.character(y[[special_colour]])
+        sc2[sc2 == ""] <- NA_character_
+        d2$special_colour <- sc2
+      } else {
+        d2$special_colour <- NA_character_
+      }
+    }
+
     d2 <- subset(d2, (is.numeric(CHR) & is.numeric(BP) & is.numeric(P)))
     d2 <- d2[order(d2$CHR, d2$BP), ]
     if (logp) {
-      d2$logp <- log10(d2$P) + ymid
-      d2 <- d2[d2$logp < 0,]
+      d2$logp <- log10(d2$P) + ymid   # negatives for plotting downwards
+      d2 <- d2[d2$logp < 0, ]
     } else {
       d2$logp <- -d2$P + ymid
-      d2 <- d2[d2$logp < 0,]
+      d2 <- d2[d2$logp < 0, ]
     }
 
-  d <- data.frame(rbind(d1,d2))
-  
+    # combine for axis calculations etc.
+    d <- data.frame(rbind(d1, d2))
   } else {
     d <- data.frame(d1)
   }
 
-  #d <- d[abs(d$logp) > ymid,]
-  
-  #----
-  # Define plotting parameters
-  #----
-
-  d$pos = NA
-  d$index = NA
-  ind = 0
+  # ---- Define plotting positions / chromosome ticks ----
+  d$pos <- NA
+  d$index <- NA
+  ind <- 0
   for (i in unique(d$CHR)) {
-    ind = ind + 1
-    d[d$CHR == i, ]$index = ind
+    ind <- ind + 1
+    d[d$CHR == i, ]$index <- ind
   }
-  nchr = length(unique(d$CHR))
+  nchr <- length(unique(d$CHR))
   if (nchr == 1) {
-    d$pos = d$BP
-    ticks = floor(length(d$pos))/2 + 1
-    xlabel = paste("Chromosome", unique(d$CHR), "position")
-    labs = ticks
+    d$pos <- d$BP
+    ticks <- floor(length(d$pos)) / 2 + 1
+    xlabel <- paste("Chromosome", unique(d$CHR), "position")
+    labs <- ticks
   } else {
-    lastbase = 0
-    ticks = NULL
+    lastbase <- 0
+    ticks <- NULL
     for (i in unique(d$index)) {
       if (i == 1) {
-        d[d$index == i, ]$pos = d[d$index == i, ]$BP
+        d[d$index == i, ]$pos <- d[d$index == i, ]$BP
+      } else {
+        lastbase <- lastbase + tail(subset(d, index == i - 1)$BP, 1)
+        d[d$index == i, ]$pos <- d[d$index == i, ]$BP + lastbase
       }
-      else {
-        lastbase = lastbase + tail(subset(d, index ==
-                                            i - 1)$BP, 1)
-        d[d$index == i, ]$pos = d[d$index == i, ]$BP +
-          lastbase
-      }
-      ticks = c(ticks, (min(d[d$index == i, ]$pos) + max(d[d$index ==
-                                                             i, ]$pos))/2 + 1)
+      ticks <- c(ticks, (min(d[d$index == i, ]$pos) + max(d[d$index == i, ]$pos)) / 2 + 1)
     }
-    xlabel = "Chromosome"
+    xlabel <- "Chromosome"
     labs <- unique(d$CHR)
   }
-  xmax = ceiling(max(d$pos) * 1.03)
-  xmin = floor(max(d$pos) * -0.03)
+  xmax <- ceiling(max(d$pos) * 1.03)
+  xmin <- floor(max(d$pos) * -0.03)
 
   print("##CALL PLOT")
-  
-  def_args <- list(xaxt = "n", bty = "n", xaxs = "i", yaxs = "i", yaxt = "n", cex.axis = 2, cex.lab = 2,
-                   las = 1, pch = 20, xlim = c(xmin, xmax), ylim = c(ymin-1,ymax+1), xlab = xlabel, ylab = expression(-log[10](italic(p))),mar=5*c(5.1,6.1,4.1,2.1))
+
+  # ---- default plotting arguments ----
+  def_args <- list(
+    xaxt = "n", bty = "n", xaxs = "i", yaxs = "i", yaxt = "n",
+    cex.axis = 1, cex.lab = 1.5, las = 1, pch = 20, cex = 2.5,
+    xlim = c(xmin, xmax), ylim = c(ymin - 1, ymax + 1),
+    xlab = xlabel, ylab = expression(-log[10](italic(p))),
+    mar = 5 * c(5.1, 6.1, 4.1, 2.1)
+  )
   dotargs <- list(...)
   do.call("plot", c(NA, dotargs, def_args[!names(def_args) %in% names(dotargs)]))
 
+  # ---- chromosome labels (optional) ----
   if (!is.null(chrlabs)) {
     if (is.character(chrlabs)) {
       if (length(chrlabs) == length(labs)) {
         labs <- chrlabs
-      }
-      else {
+      } else {
         warning("You're trying to specify chromosome labels but the number of labels != number of chromosomes.")
       }
-    }
-    else {
+    } else {
       warning("If you're trying to specify chromosome labels, chrlabs must be a character vector")
     }
   }
-  yticks <- seq(-5*ceiling(abs(ymin/5)), 5*ceiling(abs(ymax/5)), by = 5)
-  yticks <- sort(c(yticks+sign(yticks)*(5-ymid),5-ymid,-5+ymid))
-  if(is.null(y)) yticks <- yticks[yticks>=0]
-  ylabels <- abs(yticks)+ymid
-  
+
+  # ---- y ticks/labels ----
+  yticks <- seq(-5 * ceiling(abs(ymin / 5)), 5 * ceiling(abs(ymax / 5)), by = 5)
+  yticks <- sort(c(yticks + sign(yticks) * (5 - ymid), 5 - ymid, -5 + ymid))
+  if (is.null(y)) yticks <- yticks[yticks >= 0]
+  ylabels <- abs(yticks) + ymid
+
+  # ---- draw significance lines ----
   if ((abs(suggestiveline) - ymid) > 0) {
-    abline(h = suggestiveline - ymid, col = "blue")
-    if(!is.null(y)) abline(h = -suggestiveline + ymid, col = "blue")
-    }
+    abline(h = suggestiveline - ymid, col = "blue", lwd = 3)
+    if (!is.null(y)) abline(h = -suggestiveline + ymid, col = "blue", lwd = 3)
+  }
   if ((abs(genomewideline) - ymid) > 0) {
-    abline(h = genomewideline - ymid, col = "red")
-    if(!is.null(y)) abline(h = -genomewideline + ymid, col = "red")
-    }
-  if(!is.null(y)) abline(h = 0, col = "black")
-  #if(!is.null(y)) legend(0, y = ymax - ymid - 5*strheight(1), x.name, fill = col1[1], bty="n", cex = 3, title=NULL, yjust=0.5)
-  #if(!is.null(y)) legend(0, y = -ymax + ymid + 5*strheight(1), y.name, fill = col2[1], bty="n", cex = 3, title=NULL, yjust=0.5)
-  if(!is.null(y)) legend(0, y = -ymax + ymid + 5*strheight(1), c(x.name,y.name), fill = c(col1[1],col2[1]), bty="n", cex = 3, title=NULL, yjust=0.5)
-
-  if (nchr == 1) {
-    axis(1, cex.axis = 1.5, cex.lab = 1.5, las=1, ...)
-    axis(2, at = yticks, labels = ylabels, las=1, cex.axis=1.5, cex.lab = 1.5, ...)
-  } else {
-    axis(1, at = ticks, labels = labs, las=1, cex.axis = 1.5, cex.lab = 1.5, ...)
-    axis(2, at = yticks, labels = ylabels, las=1, cex.axis = 1.5, cex.lab = 1.5, ...)
+    abline(h = genomewideline - ymid, col = "red", lwd = 3)
+    if (!is.null(y)) abline(h = -genomewideline + ymid, col = "red", lwd = 3)
   }
-  col1 = rep(col1, max(d$CHR))
-  col2 = rep(col2, max(d$CHR))
-  
-  d1 <- d[d$logp>0,]
-  d2 <- d[d$logp<0,]
+  if (!is.null(y)) abline(h = 0, col = "black")
 
+  # ---- legend ----
+  if (!is.null(y)) legend(0, y = -ymax + ymid + 5 * strheight(1), c(x.name, y.name), fill = c(col1[1], col2[1]), bty = "n", cex = 1.2, title = NULL, yjust = 0.5)
+
+  # ---- axes ----
   if (nchr == 1) {
-    with(d1[d1$logp<ymax,], points(pos, logp, pch = 20, col = col1[1], ...))
-    with(d1[d1$logp>ymax,], points(pos, rep(ymax+0.5, length(pos)), pch = 2, col = col1[1], ...))
-    with(d2[d$logp>ymin,], points(pos, logp, pch = 20, col = col2[1], ...))
-    with(d2[d2$logp<ymin,], points(pos, rep(ymin-0.5, length(pos)), pch = 6, col = col2[1], ...))
+    axis(1, cex.axis = 1.5, cex.lab = 1.5, las = 1, ...)
+    axis(2, at = yticks, labels = ylabels, las = 1, cex.axis = 1.5, cex.lab = 1.5, ...)
   } else {
+    axis(1, at = ticks, labels = labs, las = 1, cex.axis = 1.5, cex.lab = 1.5, ...)
+    axis(2, at = yticks, labels = ylabels, las = 1, cex.axis = 1.5, cex.lab = 1.5, ...)
+  }
+
+  # ---- prepare colours per chromosome ----
+  col1 <- rep(col1, max(d$CHR))
+  col2 <- rep(col2, max(d$CHR))
+
+  # split positive/negative sets for plotting
+  d1 <- d[d$logp > 0, ]
+  d2 <- d[d$logp < 0, ]
+
+  # ---- Plotting points ----
+  if (nchr == 1) {
+    # single-chromosome simpler plotting
+    with(d1[d1$logp < ymax, ], points(pos, logp, pch = 20, col = col1[1], ...))
+    with(d1[d1$logp > ymax, ], points(pos, rep(ymax + 0.5, length(pos)), pch = 2, col = col1[1], ...))
+    with(d2[d2$logp > ymin, ], points(pos, logp, pch = 20, col = col2[1], ...))
+    with(d2[d2$logp < ymin, ], points(pos, rep(ymin - 0.5, length(pos)), pch = 6, col = col2[1], ...))
+  } else {
+    # multi-chromosome plotting: alternate colours per chromosome index
     print("##PLOT X")
-    icol = 1
-    for (i in unique(d1$index)) {
-      
-      if(!is.null(highlight)) {
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp<ymax & d1$highlight == 0, ], points(pos, logp, col = col1[icol], pch = 20, ...))  
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp<ymax & d1$highlight == 1, ], points(pos, logp, col = highlight_col, pch = 4, cex= 1.5, lwd= 3, ...))
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp<ymax & d1$highlight == 2, ], points(pos, logp, col = highlight_col, bg=highlight_col, pch = 24, cex= 1.5, lwd= 2, ...))
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp>ymax,], points(pos, rep(ymax+0.5, length(pos)), col = highlight_col, bg=highlight_col, pch = 24, cex=1.5, lwd = 2, ...))
-      } else {
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp<ymax, ], points(pos, logp, col = col1[icol], pch = 20, ...))  
-        with(d1[d1$index == unique(d1$index)[i] & d1$logp>ymax,], points(pos, rep(ymax+0.5, length(pos)), pch = 24, col = col1[icol], bg=col1[icol], cex=1.5, lwd = 2, ...))
-      }
-      
-      
-      icol = icol + 1
-    }
-    
-    print("##PLOT Y")
-    if(!is.null(y)) {
+    icol <- 1
+    for (idx in unique(d1$index)) {
 
-      icol = 1
-      for (i in unique(d2$index)) {
-      
-      if(!is.null(highlight)) {
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp>ymin & d2$highlight == 0, ], points(pos, logp, col = col2[icol], pch = 20, ...))
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp<ymax & d2$highlight == 1, ], points(pos, logp, col = highlight_col, pch = 4, cex = 1.5, lwd=3, ...))
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp<ymax & d2$highlight == 2, ], points(pos, logp, col = highlight_col, bg=highlight_col, pch = 25, cex = 1.5, lwd=2, ...))
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp<ymin,], points(pos, rep(ymin-0.5, length(pos)), col = highlight_col, bg=highlight_col, pch = 25, cex=1.5, lwd=2, ...))
-      } else {
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp>ymin, ], points(pos, logp, col = col2[icol], pch = 20, ...))
-        with(d2[d2$index == unique(d2$index)[i] & d2$logp<ymin,], points(pos, rep(ymin-0.5, length(pos)), pch = 25, col = col2[icol], bg=col2[icol], cex=1.5, lwd=2, ...))
+      # If highlight column provided, draw highlight shapes (takes precedence for shapes)
+      if (!is.null(highlight)) {
+        with(d1[d1$index == idx & d1$logp < ymax & d1$highlight == 0, ], points(pos, logp, col = col1[icol], pch = 20, ...))
+        with(d1[d1$index == idx & d1$logp < ymax & d1$highlight == 1, ], points(pos, logp, col = highlight_col, pch = 4, cex = 4, lwd = 5, ...))
+        with(d1[d1$index == idx & d1$logp < ymax & d1$highlight == 2, ], points(pos, logp, col = highlight_col, bg = highlight_col, pch = 24, cex = 1.5, lwd = 2, ...))
+        with(d1[d1$index == idx & d1$logp > ymax, ], points(pos, rep(ymax + 0.5, length(pos)), col = highlight_col, bg = highlight_col, pch = 24, cex = 1.5, lwd = 2, ...))
       }
-      
-      
-      icol = icol + 1
+
+      # special colouring: draw points flagged as special using their provided colour (fallback to default)
+      if (special_colouring) {
+        # non-special (or NA) points first
+        other <- d1[d1$index == idx & d1$logp < ymax & !( !is.na(d1$special_flag) & d1$special_flag == TRUE), ]
+        if (nrow(other) > 0) points(other$pos, other$logp, col = col1[icol], pch = 20, ...)
+        # special points with explicit colours
+        tmp <- d1[d1$index == idx & d1$logp < ymax & !is.na(d1$special_flag) & d1$special_flag == TRUE, ]
+        if (nrow(tmp) > 0) {
+          tmpcols <- ifelse(is.na(tmp$special_colour) | tmp$special_colour == "", col1[icol], tmp$special_colour)
+          points(tmp$pos, tmp$logp, col = tmpcols, pch = 20, ...)
+        }
+        # clipped-up points
+        upclip <- d1[d1$index == idx & d1$logp > ymax, ]
+        if (nrow(upclip) > 0) points(upclip$pos, rep(ymax + 0.5, nrow(upclip)), pch = 24, col = col1[icol], bg = col1[icol], cex = 1.5, lwd = 2, ...)
+      } else if (is.null(highlight)) {
+        # neither special nor highlight -> plain plotting
+        with(d1[d1$index == idx & d1$logp < ymax, ], points(pos, logp, col = col1[icol], pch = 20, ...))
+        with(d1[d1$index == idx & d1$logp > ymax, ], points(pos, rep(ymax + 0.5, length(pos)), pch = 24, col = col1[icol], bg = col1[icol], cex = 1.5, lwd = 2, ...))
+      }
+
+      icol <- icol + 1
+    }
+
+    print("##PLOT Y")
+    if (!is.null(y)) {
+      icol <- 1
+      for (idx in unique(d2$index)) {
+
+        if (!is.null(highlight)) {
+          with(d2[d2$index == idx & d2$logp > ymin & d2$highlight == 0, ], points(pos, logp, col = col2[icol], pch = 20, ...))
+          with(d2[d2$index == idx & d2$logp < ymax & d2$highlight == 1, ], points(pos, logp, col = highlight_col, pch = 4, cex = 4, lwd = 5, ...))
+          with(d2[d2$index == idx & d2$logp < ymax & d2$highlight == 2, ], points(pos, logp, col = highlight_col, bg = highlight_col, pch = 25, cex = 1.5, lwd = 2, ...))
+          with(d2[d2$index == idx & d2$logp < ymin, ], points(pos, rep(ymin - 0.5, length(pos)), col = highlight_col, bg = highlight_col, pch = 25, cex = 1.5, lwd = 2, ...))
+        }
+
+        if (special_colouring) {
+          other <- d2[d2$index == idx & d2$logp > ymin & !( !is.na(d2$special_flag) & d2$special_flag == TRUE), ]
+          if (nrow(other) > 0) points(other$pos, other$logp, col = col2[icol], pch = 20, ...)
+          tmp <- d2[d2$index == idx & d2$logp > ymin & !is.na(d2$special_flag) & d2$special_flag == TRUE, ]
+          if (nrow(tmp) > 0) {
+            tmpcols <- ifelse(is.na(tmp$special_colour) | tmp$special_colour == "", col2[icol], tmp$special_colour)
+            points(tmp$pos, tmp$logp, col = tmpcols, pch = 20, ...)
+          }
+          downclip <- d2[d2$index == idx & d2$logp < ymin, ]
+          if (nrow(downclip) > 0) points(downclip$pos, rep(ymin - 0.5, nrow(downclip)), pch = 25, col = col2[icol], bg = col2[icol], cex = 1.5, lwd = 2, ...)
+        } else if (is.null(highlight)) {
+          with(d2[d2$index == idx & d2$logp > ymin, ], points(pos, logp, col = col2[icol], pch = 20, ...))
+          with(d2[d2$index == idx & d2$logp < ymin, ], points(pos, rep(ymin - 0.5, length(pos)), pch = 25, col = col2[icol], bg = col2[icol], cex = 1.5, lwd = 2, ...))
+        }
+
+        icol <- icol + 1
       }
     }
   }
 
-
-
-  #----
-  # Plot names
-  #----
-  
+  # ---- Labels block (unchanged logic but safer forbidden construction) ----
   if (!is.null(label)) {
-    required_cols <- c("LABEL","CHR","POS","P")
-    if (is.null(colnames(label))) warning(paste("label must be a data.frame with col.names:",paste0(required_cols,collapse=" ")))
+    required_cols <- c("LABEL", "CHR", "POS", "P")
+    if (is.null(colnames(label))) warning(paste("label must be a data.frame with col.names:", paste0(required_cols, collapse = " ")))
     label <- data.frame(label)
-    
-    if (all(required_cols %in% colnames(label))) {  
-      label$pos <- label$POS
-      for (i in unique(label$CHR)[!unique(label$CHR)==1]) {
-        lastbase <- tail(d[d$index==(i-1),"pos"],n=1)
-        label[label$CHR==i,"pos"] <- label[label$CHR==i,"pos"]+lastbase
-      }
-      
-      #with(label, points(pos, P, col = "#974d26", pch = 4, cex=2, ...))
 
-      label$P <- ifelse(label$P>0, label$P-ymid+2*strheight(label$LABEL), label$P+ymid-2*strheight(label$LABEL))
-      label$P <- ifelse(label$P>ymax,ymax-strheight(label$LABEL)/2,label$P)
-      label$P <- ifelse(label$P<ymin,ymin+strheight(label$LABEL)/2,label$P)
-      label <- label[order(-sign(label$P),abs(label$P),label$pos),]
+    if (!all(required_cols %in% colnames(label))) {
+      warning(paste("label data.frame is missing columns:", paste0(required_cols[!required_cols %in% colnames(label)], collapse = " ")))
+    } else {
+
+      # compute label positions in global coordinates
+      label$pos <- label$POS
+      for (i in unique(label$CHR)[!unique(label$CHR) == 1]) {
+        lastbase <- tail(d[d$index == (i - 1), "pos"], n = 1)
+        label[label$CHR == i, "pos"] <- label[label$CHR == i, "pos"] + lastbase
+      }
+
+      # adjust label P positions and clamp inside ymin/ymax
+      label$P <- ifelse(label$P > 0, label$P - ymid + 2 * strheight(label$LABEL), label$P + ymid - 2 * strheight(label$LABEL))
+      label$P <- ifelse(label$P > ymax, ymax - strheight(label$LABEL) / 2, label$P)
+      label$P <- ifelse(label$P < ymin, ymin + strheight(label$LABEL) / 2, label$P)
+      label <- label[order(-sign(label$P), abs(label$P), label$pos), ]
       row.names(label) <- 1:nrow(label)
 
       print("##POSITION LABELS")
-      
+
       x.buffer <- strwidth("A")
       y.buffer <- strheight("A")
 
-      label$YMIN <- label$P - strheight(label$LABEL)/2
-      label$YMAX <- label$P + strheight(label$LABEL)/2
+      label$YMIN <- label$P - strheight(label$LABEL) / 2
+      label$YMAX <- label$P + strheight(label$LABEL) / 2
 
-      label$XMIN <- label$pos - strwidth(label$LABEL)/2 - x.buffer
-      label$XMAX <- label$pos + strwidth(label$LABEL)/2 + x.buffer
-      
-      forbidden <- data.frame(data.table(d)[highlight==TRUE,.(pos,P=logp,XMIN=pos-strwidth("A")/2, XMAX=pos+strwidth("A")/2, YMIN=ifelse(logp<ymin,ymin,ifelse(logp>ymax,ymax,logp - sign(logp) * strheight("A")/2)), YMAX=ifelse(logp>ymax, ymax, ifelse(logp<ymin,ymin,logp + sign(logp) * strheight("A")/2)))])
-
-      #ggplot(label, aes(x=pos, xmin=XMIN, xmax=XMAX, y=(YMIN+YMAX)/2, ymin=YMIN, ymax=YMAX)) + geom_point(data=forbidden, aes(x=pos, y=YMAX), colour="red") + geom_rect() + geom_text(aes(label=LABEL), size=4, color="white") 
+      # safer forbidden points creation: use d$highlight explicitly
+      if (!is.null(highlight) && "highlight" %in% names(d)) {
+        fh <- which(d$highlight == TRUE)
+        if (length(fh) > 0) {
+          forbidden <- data.frame(
+            pos = d$pos[fh],
+            P = d$logp[fh],
+            XMIN = d$pos[fh] - strwidth("A") / 2,
+            XMAX = d$pos[fh] + strwidth("A") / 2,
+            YMIN = ifelse(d$logp[fh] < ymin, ymin, ifelse(d$logp[fh] > ymax, ymax, d$logp[fh] - sign(d$logp[fh]) * strheight("A") / 2)),
+            YMAX = ifelse(d$logp[fh] > ymax, ymax, ifelse(d$logp[fh] < ymin, ymin, d$logp[fh] + sign(d$logp[fh]) * strheight("A") / 2))
+          )
+        } else {
+          forbidden <- data.frame(pos = numeric(0), P = numeric(0), XMIN = numeric(0), XMAX = numeric(0), YMIN = numeric(0), YMAX = numeric(0))
+        }
+      } else {
+        forbidden <- data.frame(pos = numeric(0), P = numeric(0), XMIN = numeric(0), XMAX = numeric(0), YMIN = numeric(0), YMAX = numeric(0))
+      }
 
       rect_overlap <- function(df1, df2) {
         return(!(df2$XMAX <= df1$XMIN | df2$XMIN >= df1$XMAX | df2$YMAX <= df1$YMIN | df2$YMIN >= df1$YMAX))
       }
 
-
+      # iterative moving to avoid overlaps
       for (precision in 1:10) {
-      
-      for (i in 1:nrow(label)) {
-      
+        for (i in 1:nrow(label)) {
 
-      n <- 0
-      repeat{
-      overlap_highlight <- forbidden[rect_overlap(df1=label[i,], df2=forbidden),]
-      
-      if(nrow(overlap_highlight) > 0) {
-        if(all(overlap_highlight$P > 0)) {
-          label[i,"YMAX"] <- max(overlap_highlight$YMAX) + strheight("A")/2*3 + y.buffer
-          label[i,"YMIN"] <- max(overlap_highlight$YMAX) + strheight("A")/2 + y.buffer
-        } else {
-          label[i,"YMIN"] <- min(overlap_highlight$YMIN) - strheight("A")/2*3 - y.buffer
-          label[i,"YMAX"] <- min(overlap_highlight$YMIN) - strheight("A")/2 - y.buffer
+          n <- 0
+          repeat {
+            overlap_highlight <- forbidden[rect_overlap(df1 = label[i, ], df2 = forbidden), ]
+
+            if (nrow(overlap_highlight) > 0) {
+              if (all(overlap_highlight$P > 0)) {
+                label[i, "YMAX"] <- max(overlap_highlight$YMAX) + strheight("A") / 2 * 3 + y.buffer
+                label[i, "YMIN"] <- max(overlap_highlight$YMAX) + strheight("A") / 2 + y.buffer
+              } else {
+                label[i, "YMIN"] <- min(overlap_highlight$YMIN) - strheight("A") / 2 * 3 - y.buffer
+                label[i, "YMAX"] <- min(overlap_highlight$YMIN) - strheight("A") / 2 - y.buffer
+              }
+            }
+
+            overlap <- rbind(label[i, ], label[-i, ][rect_overlap(df1 = label[i, ], df2 = label[-i, ]), ])
+
+            if (nrow(overlap) == 1) break
+            n <- n + 1
+            if (n == 1) cat("\n", label[i, "LABEL"], "")
+            cat(n, "")
+
+            if (all(overlap$P > 0)) {
+              overlap[1, "YMAX"] <- max(overlap[-1, "YMAX"]) + strheight("A") / 2 * 3 + y.buffer
+              overlap[1, "YMIN"] <- max(overlap[-1, "YMAX"]) + strheight("A") / 2 + y.buffer
+            } else {
+              overlap[1, "YMIN"] <- min(overlap[-1, "YMIN"]) - strheight("A") / 2 * 3 - y.buffer
+              overlap[1, "YMAX"] <- min(overlap[-1, "YMIN"]) - strheight("A") / 2 - y.buffer
+            }
+
+            label[match(paste0(overlap$LABEL, overlap$P), paste0(label$LABEL, label$P)), ] <- overlap
+          }
         }
       }
 
-      overlap <- rbind(label[i,], label[-i,][rect_overlap(df1=label[i,], df2=label[-i,]),])
-      
+      cat("\n")
 
-      if(nrow(overlap) == 1 ) break
+      label$P <- ifelse(label$P > ymax, ymax - strheight(label$LABEL) / 6, label$P)
+      label$P <- ifelse(label$P < ymin, ymin + strheight(label$LABEL) / 6, label$P)
+      moved <- data.table::data.table(label)[P != (YMIN + YMAX) / 2, .(x = pos, y1 = P, y2 = (YMIN + YMAX) / 2)]
 
-      n <- n+1
-      if(n == 1) cat("\n",label[i,"LABEL"],"")
-      cat(n,"")
-      
+      for (i in 1:nrow(moved)) lines(x = moved[i, x] + c(0, 0), y = c(moved[i, y1], moved[i, y2]) - sign(moved[i, y1]) * strheight("A"))
 
-      if(all(overlap$P > 0)) {
-        overlap[1,"YMAX"] <- max(overlap[-1,"YMAX"]) + strheight("A")/2*3 + y.buffer
-        overlap[1,"YMIN"] <- max(overlap[-1,"YMAX"]) + strheight("A")/2 + y.buffer
-      } else {
-        overlap[1,"YMIN"] <- min(overlap[-1,"YMIN"]) - strheight("A")/2*3 - y.buffer
-        overlap[1,"YMAX"] <- min(overlap[-1,"YMIN"]) - strheight("A")/2 - y.buffer
+      shadowtext <- function(x, y = NULL, labels, col = 'white', bg = 'black',
+                             theta = seq(0, 2 * pi, length.out = 50), r = 0.1, ...) {
+        xy <- xy.coords(x, y)
+        xo <- r * strwidth('A')
+        yo <- r * strheight('A')
+        for (i in theta) {
+          text(xy$x + cos(i) * xo, xy$y + sin(i) * yo, labels, col = bg, ...)
+        }
+        text(xy$x, xy$y, labels, col = col, ...)
       }
 
-      label[match(paste0(overlap$LABEL,overlap$P),paste0(label$LABEL,label$P)),] <- overlap
-      }
-      }
-    }
-    cat("\n")
-
-      label$P <- ifelse(label$P>ymax,ymax-strheight(label$LABEL)/6,label$P)
-      label$P <- ifelse(label$P<ymin,ymin+strheight(label$LABEL)/6,label$P)
-      moved <- data.table(label)[P!=(YMIN+YMAX)/2, .(x=pos, y1=P, y2=(YMIN+YMAX)/2)]
-
-      for(i in 1:nrow(moved)) lines(x=moved[i,x] + c(0,0), y=c(moved[i,y1], moved[i,y2]) - sign(moved[i,y1]) * strheight("A"))
-
-
-      shadowtext <- function(x, y=NULL, labels, col='white', bg='black', 
-                       theta= seq(0, 2*pi, length.out=50), r=0.1, ... ) {
-        xy <- xy.coords(x,y)
-        xo <- r*strwidth('A')
-        yo <- r*strheight('A')
-      # draw background text with small shift in x and y in background colour
-      for (i in theta) {
-        text( xy$x + cos(i)*xo, xy$y + sin(i)*yo, labels, col=bg, ... )
-      }
-        # draw actual text in exact xy position in foreground colour
-        text(xy$x, xy$y, labels, col=col, ... )
-      }
-      
       print("##DRAW LABELS")
-      with(label, shadowtext(x=pos,y=(YMIN+YMAX)/2,labels=LABEL,cex=1.25,col="black",bg="white",font=4,r=0.2))
-
-     } else {
-      warning(paste("label data.frame is missing columns:",paste0(required_cols[!required_cols%in%colnames(label)],collapse=" ")))
-     }
-   }
+      with(label, shadowtext(x = pos, y = (YMIN + YMAX) / 2, labels = LABEL, cex = 1.25, col = "black", bg = "white", font = 4, r = 0.2))
+    }
+  }
 
   par(xpd = FALSE)
 }
@@ -419,8 +504,13 @@ plot_QQ <- function (gwas_results, p_value_threshold = 1, sample_rate = 1,
 all_files = Sys.glob("/scratch/project_2007428/projects/prj_001_cost_gwas/outputs/cohort_sumstats/*/*.gz")
 all_files = all_files[!(grepl("aligned", all_files))]
 
-#for (i in 1:length(all_files)){ # FOR ALL
-for (i in 147:length(all_files)){ # FOR SUBSET
+### For the sensitivity analysis
+
+all_files = all_files[grepl("UKB.*ALL\\.ALL\\.EUR", all_files) | grepl("RAW_COST", all_files) | grepl("NO_ZERO", all_files)]
+all_files = all_files[-1]
+
+for (i in 1:length(all_files)){ # FOR ALL
+#for (i in 147:length(all_files)){ # FOR SUBSET
 
   ### Reading file and getting variable and column names
 
@@ -437,6 +527,22 @@ for (i in 147:length(all_files)){ # FOR SUBSET
   sample_size = as.numeric(strsplit(curr_file_name, "\\.")[[1]][7])
 
   population = strsplit(curr_file_name, "\\.")[[1]][6]
+
+  if (grepl("RAW_COST", curr_file_name) | grepl("NO_ZERO", curr_file_name)) {
+
+    sample_size = as.numeric(strsplit(curr_file_name, "\\.")[[1]][8])
+
+    population = strsplit(curr_file_name, "\\.")[[1]][7]
+
+    stratif_name_3 = strsplit(curr_file_name, "\\.")[[1]][6]
+
+    SENSITIVITY_TEST = TRUE
+
+  } else {
+
+    SENSITIVITY_TEST = FALSE
+
+  }
 
   if (cohort == "QGP"){
 
@@ -514,6 +620,12 @@ for (i in 147:length(all_files)){ # FOR SUBSET
                               stratif_name_1 == "ALL" & stratif_name_2 != "ALL" ~ stratif_name_2,
                               .default = as.character(stratif_name_1))
 
+  if (isTRUE(SENSITIVITY_TEST)) {
+
+    stratif_name = stratif_name_3
+
+  }
+
   nice_stratif_name = case_when(stratif_name == "36_55" ~ "age between 36-55",
                                   stratif_name == "19_35" ~ "age between 19-35",
                                   stratif_name == "5_18" ~ "age between 5-18",
@@ -521,6 +633,8 @@ for (i in 147:length(all_files)){ # FOR SUBSET
                                   stratif_name == "76_95" ~ "age 76+",
                                   stratif_name == "M" ~ "males",
                                   stratif_name == "F" ~ "females",
+                                  stratif_name == "NO_ZERO" ~ "no zeroes",
+                                  stratif_name == "RAW_COST" ~ "raw costs",
                                   .default = as.character(stratif_name_1))
 
   cat(paste0("Variable names collected.\nCohort: ", cohort,
@@ -598,11 +712,11 @@ for (i in 147:length(all_files)){ # FOR SUBSET
   ### TOTAL/GP = BLACK/GREEN
   ### HES/PRESCRIPT = BLUE/ORANGE
 
-  green_set = c("#006d2c", "#238b45", "#41ab5d") # Primary
-  blue_set = c("#2166ac","#2171b5","#4393c3") # Inpatient
-  purple_set = c("#542788","#6a51a3","#8073ac") # INOUT patient
+  green_set = c("#33BBBB", "#009988", "#006655") # Primary
+  blue_set = c("#3399DD", "#0077BB", "#004488") # Inpatient
+  purple_set = c("#FF5599", "#EE3377", "#AA1144") # INOUT patient
   black_set = c("#252525", "#525252", "#737373") # Total
-  orange_set = c("#ff7b00", "#ffa500", "#ffba00") # Prescription
+  orange_set = c("#FF9955", "#EE7733", "#BB5500") # Prescription
 
   colour_use = case_when(trait_name == "ALL" ~ black_set,
                           trait_name == "INOUT" ~ purple_set,
@@ -644,7 +758,7 @@ for (i in 147:length(all_files)){ # FOR SUBSET
   }
 
   fig_name = ifelse(stratif_name == "ALL", paste0(trait_name, "_costs_", cohort, "_n_", sample_size), paste0(trait_name, "_costs_", stratif_name, "_", cohort, "_n_", sample_size))
-  legend_name = ifelse(stratif_name == "ALL", paste0(nice_cohort_name, " ", nice_name, " costs, N = ", sample_size), paste0(nice_cohort_name, " ", nice_name, " costs (stratified by ", nice_stratif_name, "), N = ", sample_size))
+  legend_name = ifelse(stratif_name == "ALL", paste0(nice_cohort_name, " ", nice_name, " costs, N = ", sample_size), paste0(nice_cohort_name, " ", nice_name, " costs (stratification: ", nice_stratif_name, "), N = ", sample_size))
 
   max_p = 5 * (ceiling(-log10(min(curr_pheno_manhattan[, p_col])) / 5))
 

@@ -80,7 +80,7 @@ fi
 ### Special handling for FINNGEN variants
 
 if [[ "$file_only" == FINNGEN_* ]]; then
-]
+
     ### Extract anything between "${phenotype}_" and "_ldsc"
 
     gwas_format=$(echo "$file_only" | grep -oP "(?<=${phenotype}_).*(?=_ldsc)" || true)
