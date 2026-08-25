@@ -5,7 +5,7 @@ library(reshape)
 library(ggplot2)
 library(tidyverse)
 
-phenotype = "SENSITIVITY_TEST"
+phenotype = "META_v4"
 n_cohorts = length(Sys.glob(paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/processing/ldsc_intermediate_files/", phenotype, "/*_ldsc_input.txt.gz"))) - 1
 
 all_corrs = Sys.glob(paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/processing/ldsc_intermediate_files/", phenotype, "/*ldsc_corr.log"))
@@ -42,7 +42,7 @@ outFile$cohort2 = gsub("_ldsc_input.txt.gz", "", outFile$cohort2)
 
 ### Create custom null hypothesis p-value (for null hypothesis = 1)
 
-outFile$Pval = pchisq((abs(outFile$rg) - 1 / outFile$se) ^ 2,
+outFile$Pval = pchisq(((abs(outFile$rg) - 1) / outFile$se) ^ 2,
 							df = 1,
 							lower = F)
 
@@ -77,12 +77,12 @@ fwrite(outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/outp
 ### Additional lines specifically for the SENSITIVITY ANALYSIS
 ### Reduces the table to only comparison between phenotypes (e.g. IN with IN and not IN with DRUG)
 
-#get_pheno = function(x) gsub(".*UKB_(IN|DRUG|PRIM).*", "\\1", x)
+get_pheno = function(x) gsub(".*UKB_(IN|DRUG|PRIM).*", "\\1", x)
 
-#filtered_outFile = filtered_outFile[get_pheno(filtered_outFile$cohort1) == get_pheno(filtered_outFile$cohort2),]
+filtered_outFile = filtered_outFile[get_pheno(filtered_outFile$cohort1) == get_pheno(filtered_outFile$cohort2),]
 
-#fwrite(filtered_outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/outputs/ldsc/cohort_ldsc_correlations_", phenotype, "_PRUNED_v04.txt"),
-#		quote = FALSE, sep = "\t", row.names = FALSE, na = "NA")
+fwrite(filtered_outFile, paste0("/scratch/project_2007428/projects/prj_001_cost_gwas/outputs/ldsc/cohort_ldsc_correlations_", phenotype, "_PRUNED_v04.txt"),
+		quote = FALSE, sep = "\t", row.names = FALSE, na = "NA")
 
 
 outFile_rgs = outFile
