@@ -30,8 +30,8 @@ original_categories = fread(category_file, data.table = FALSE)
 
 ##### =========================== #####
 
-Sys.setenv(OPENAI_API_KEY = # THIS IS NOT FOR SHARING)
-
+Sys.setenv(OPENAI_API_KEY = # THIS IS NOT FOR SHARING
+)
 ### OpenAI API caller function
 ### By ChatGPT
 
